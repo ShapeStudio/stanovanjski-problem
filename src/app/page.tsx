@@ -5,6 +5,22 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
+interface CalculationResult {
+  maxPrice: number;
+  centralSize: number;
+  centralType: string;
+  suburbSize: number;
+  suburbType: string;
+  mortgagePayment: number;
+  monthlyInsurance: number;
+  hoaFees: number;
+  totalPITI: number;
+  maxPITI: number;
+  totalDebt: number;
+  maxTotalDebt: number;
+  income: number;
+}
+
 const HouseIcon = () => (
   <svg
     viewBox="0 0 24 24"
@@ -36,7 +52,7 @@ export default function Home() {
     hoaFees: 0,
   });
 
-  const [result, setResult] = useState(null);
+  const [result, setResult] = useState<CalculationResult | null>(null);
   const [paymentAdjustment, setPaymentAdjustment] = useState(0); // -50 to +50 percent
 
   const formatNumber = (value: number) => {
@@ -62,7 +78,7 @@ export default function Home() {
     return basePayment * (1 + paymentAdjustment / 100);
   };
 
-  const calculateAdjustedPrice = (basePrice: number, basePayment: number) => {
+  const calculateAdjustedPrice = (basePrice: number) => {
     const adjustmentFactor = (1 + paymentAdjustment / 100);
     return basePrice * adjustmentFactor;
   };
@@ -253,7 +269,7 @@ export default function Home() {
               <div className="space-y-6">
                 <div className="text-center">
                   <h3 className="text-xl font-semibold mb-2">You can afford a property up to</h3>
-                  <div className="text-3xl font-bold text-blue-600">€{formatNumber(Math.round(calculateAdjustedPrice(result.maxPrice, result.totalPITI)))}</div>
+                  <div className="text-3xl font-bold text-blue-600">€{formatNumber(Math.round(calculateAdjustedPrice(result.maxPrice)))}</div>
                   <p className="text-sm text-gray-500 mt-2">
                     Based on your income, a property at this price may stretch your budget.
                   </p>
@@ -301,13 +317,13 @@ export default function Home() {
                     />
                     <div className="flex justify-between text-sm text-gray-500">
                       <span>-50%</span>
-                      <span className={`font-medium ${
-                        getPaymentColor(
-                          calculateAdjustedPayment(result.totalPITI),
-                          result.income / 12
-                        ).replace('bg-', 'text-')
-                      }`}>
-                        {((calculateAdjustedPayment(result.totalPITI) / (result.income / 12)) * 100).toFixed(1)}% of Income
+                      <span className={`font-medium ${getPaymentColor(
+                        calculateAdjustedPayment(result.totalPITI),
+                        result.income / 12
+                      ).replace('bg-', 'text-')}`}>
+                        {`${
+                          ((calculateAdjustedPayment(result.totalPITI) / (result.income / 12)) * 100).toFixed(1)
+                        }% of Income`}
                       </span>
                       <span>+50%</span>
                     </div>
@@ -317,20 +333,20 @@ export default function Home() {
                 <div className="grid grid-cols-2 gap-4 mt-6">
                   <div>
                     <p className="font-semibold">In Central Ljubljana (4,687 €/m²):</p>
-                    <p>Size: {(calculateAdjustedPrice(result.maxPrice, result.totalPITI) / 4687).toFixed(2)} m²</p>
+                    <p>Size: {(calculateAdjustedPrice(result.maxPrice) / 4687).toFixed(2)} m²</p>
                     <p>Type: {
                       (() => {
-                        const size = calculateAdjustedPrice(result.maxPrice, result.totalPITI) / 4687;
+                        const size = calculateAdjustedPrice(result.maxPrice) / 4687;
                         return size < 40 ? "Studio" : size < 64 ? "One Bedroom" : size < 90 ? "Two Bedroom" : "Three Bedroom or Larger";
                       })()
                     }</p>
                   </div>
                   <div>
                     <p className="font-semibold">In Suburbs (2,500 €/m²):</p>
-                    <p>Size: {(calculateAdjustedPrice(result.maxPrice, result.totalPITI) / 2500).toFixed(2)} m²</p>
+                    <p>Size: {(calculateAdjustedPrice(result.maxPrice) / 2500).toFixed(2)} m²</p>
                     <p>Type: {
                       (() => {
-                        const size = calculateAdjustedPrice(result.maxPrice, result.totalPITI) / 2500;
+                        const size = calculateAdjustedPrice(result.maxPrice) / 2500;
                         return size < 40 ? "Studio" : size < 64 ? "One Bedroom" : size < 90 ? "Two Bedroom" : "Three Bedroom or Larger";
                       })()
                     }</p>
@@ -352,7 +368,9 @@ export default function Home() {
                 </div>
               </div>
             ) : (
-              <p className="text-muted-foreground">Enter your details and click "Calculate" to see results.</p>
+              <div>
+                <p className="text-muted-foreground">Enter your details and click &quot;Calculate&quot; to see results.</p>
+              </div>
             )}
           </CardContent>
         </Card>
