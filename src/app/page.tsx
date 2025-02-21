@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 
 interface CalculationResult {
   maxPrice: number;
@@ -170,12 +170,13 @@ export default function Home() {
         {/* Left Column: Form */}
         <Card>
           <CardHeader>
-            <CardTitle>Input Your Details</CardTitle>
+            <CardTitle>Vnesi svoje prihodke</CardTitle>
+            <CardDescription>Vnešenih podatkov, ne shranjujemo. Projekt je odprtokoden.</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={calculateAffordability} className="space-y-4">
               <div>
-                <label htmlFor="income" className="block text-sm font-medium">Combined Annual Income (€)</label>
+                <label htmlFor="income" className="block text-sm font-medium">Letni prihodek</label>
                 <div className="relative">
                   <Input 
                     type="text" 
@@ -192,7 +193,7 @@ export default function Home() {
                 </div>
               </div>
               <div>
-                <label htmlFor="downPayment" className="block text-sm font-medium">Down Payment (€)</label>
+                <label htmlFor="downPayment" className="block text-sm font-medium">Prihranki (Polog)</label>
                 <div className="relative">
                   <Input 
                     type="text" 
@@ -209,7 +210,7 @@ export default function Home() {
                 </div>
               </div>
               <div>
-                <label htmlFor="monthlyDebt" className="block text-sm font-medium">Monthly Debt Payments (€)</label>
+                <label htmlFor="monthlyDebt" className="block text-sm font-medium">Trenutne mesečne obveznosti</label>
                 <div className="relative">
                   <Input 
                     type="text" 
@@ -226,19 +227,19 @@ export default function Home() {
                 </div>
               </div>
               <div>
-                <label htmlFor="interestRate" className="block text-sm font-medium">Interest Rate (%)</label>
+                <label htmlFor="interestRate" className="block text-sm font-medium">Obrestna mera (%)</label>
                 <Input type="number" id="interestRate" name="interestRate" value={formData.interestRate} onChange={handleChange} step="0.1" min="0" max="20" required />
               </div>
               <div>
-                <label htmlFor="loanTerm" className="block text-sm font-medium">Loan Term (years)</label>
+                <label htmlFor="loanTerm" className="block text-sm font-medium">Trajanje kredita (let)</label>
                 <Input type="number" id="loanTerm" name="loanTerm" value={formData.loanTerm} onChange={handleChange} step="1" min="1" max="50" required />
               </div>
               <div>
-                <label htmlFor="insuranceRate" className="block text-sm font-medium">Insurance Rate (%)</label>
+                <label htmlFor="insuranceRate" className="block text-sm font-medium">Precent na za plačilo zavarovanja (%)</label>
                 <Input type="number" id="insuranceRate" name="insuranceRate" value={formData.insuranceRate} onChange={handleChange} step="0.1" min="0" max="5" required />
               </div>
               <div>
-                <label htmlFor="hoaFees" className="block text-sm font-medium">Monthly HOA Fees (€)</label>
+                <label htmlFor="hoaFees" className="block text-sm font-medium">Stanovanjski sklad</label>
                 <div className="relative">
                   <Input 
                     type="text" 
@@ -254,7 +255,7 @@ export default function Home() {
                   </div>
                 </div>
               </div>
-              <Button type="submit" className="w-full">Calculate</Button>
+              <Button type="submit" className="w-full">Izračunaj</Button>
             </form>
           </CardContent>
         </Card>
@@ -262,17 +263,23 @@ export default function Home() {
         {/* Right Column: Results */}
         <Card>
           <CardHeader>
-            <CardTitle>Results</CardTitle>
+            <CardTitle>Rezulat</CardTitle>
           </CardHeader>
           <CardContent>
             {result ? (
               <div className="space-y-6">
                 <div className="text-center">
-                  <h3 className="text-xl font-semibold mb-2">You can afford a property up to</h3>
+                  <h3 className="text-xl font-semibold mb-2">Privoščiš si lahko nepremičnino do:</h3>
                   <div className="text-3xl font-bold text-blue-600">€{formatNumber(Math.round(calculateAdjustedPrice(result.maxPrice)))}</div>
-                  <p className="text-sm text-gray-500 mt-2">
-                    Based on your income, a property at this price may stretch your budget.
-                  </p>
+                  {Number(((calculateAdjustedPayment(result.totalPITI) / (result.income / 12)) * 100).toFixed(1)) < 30 ? (
+                    <p className="text-sm text-gray-500 mt-2">
+                      Glede na prihodek je izračunana vrednost smotrna.
+                    </p>
+                  ) : (
+                    <p className="text-sm text-gray-500 mt-2">
+                      Glede na prihodek je izračunana vrednost rizična.
+                    </p>
+                  )}
                 </div>
 
                 <div className="relative py-8">
@@ -298,14 +305,14 @@ export default function Home() {
                   {/* Monthly Payment Bubble */}
                   <div className="absolute right-0 top-12 bg-white rounded-lg shadow-lg p-2 border border-gray-200">
                     <p className="text-sm font-semibold">
-                      €{formatNumber(Math.round(calculateAdjustedPayment(result.totalPITI)))}/mo
+                      €{formatNumber(Math.round(calculateAdjustedPayment(result.totalPITI)))}/meses
                     </p>
                   </div>
 
                   {/* Payment Adjustment Slider */}
                   <div className="mt-12 space-y-2">
                     <label className="block text-sm font-medium text-gray-700">
-                      Adjust Monthly Payment
+                      Prilagodi mesečno plačilo
                     </label>
                     <input
                       type="range"
@@ -332,44 +339,44 @@ export default function Home() {
 
                 <div className="grid grid-cols-2 gap-4 mt-6">
                   <div>
-                    <p className="font-semibold">In Central Ljubljana (4,687 €/m²):</p>
+                    <p className="font-semibold">v centru Ljubljane (4,687 €/m²):</p>
                     <p>Size: {(calculateAdjustedPrice(result.maxPrice) / 4687).toFixed(2)} m²</p>
                     <p>Type: {
                       (() => {
                         const size = calculateAdjustedPrice(result.maxPrice) / 4687;
-                        return size < 40 ? "Studio" : size < 64 ? "One Bedroom" : size < 90 ? "Two Bedroom" : "Three Bedroom or Larger";
+                        return size < 40 ? "Garsoniera" : size < 64 ? "Eno sobno" : size < 90 ? "Dvo sobno" : "Tri ali več sobno";
                       })()
                     }</p>
                   </div>
                   <div>
-                    <p className="font-semibold">In Suburbs (2,500 €/m²):</p>
+                    <p className="font-semibold">v okolici Ljubljane (2,500 €/m²):</p>
                     <p>Size: {(calculateAdjustedPrice(result.maxPrice) / 2500).toFixed(2)} m²</p>
                     <p>Type: {
                       (() => {
                         const size = calculateAdjustedPrice(result.maxPrice) / 2500;
-                        return size < 40 ? "Studio" : size < 64 ? "One Bedroom" : size < 90 ? "Two Bedroom" : "Three Bedroom or Larger";
+                        return size < 40 ? "Garsoniera" : size < 64 ? "Eno sobno" : size < 90 ? "Dvo sobno" : "Tri ali več sobno";
                       })()
                     }</p>
                   </div>
                 </div>
 
                 <div className="space-y-2 border-t pt-4 mt-4">
-                  <p className="font-semibold">Monthly Costs Breakdown:</p>
+                  <p className="font-semibold">Mesečne obveznosti:</p>
                   <div className="grid grid-cols-2 gap-2 text-sm">
-                    <p>Mortgage:</p>
+                    <p>Kredit:</p>
                     <p className="text-right">€{formatNumber(Math.round(result.mortgagePayment))}</p>
-                    <p>Insurance:</p>
+                    <p>Zavarovanje:</p>
                     <p className="text-right">€{formatNumber(Math.round(result.monthlyInsurance))}</p>
-                    <p>HOA Fees:</p>
+                    <p>Stroški sklada:</p>
                     <p className="text-right">€{formatNumber(Math.round(result.hoaFees))}</p>
-                    <p className="font-semibold">Total Monthly Cost:</p>
+                    <p className="font-semibold">Skupno mesečno obveznosti:</p>
                     <p className="text-right font-semibold">€{formatNumber(Math.round(result.totalPITI))}</p>
                   </div>
                 </div>
               </div>
             ) : (
               <div>
-                <p className="text-muted-foreground">Enter your details and click &quot;Calculate&quot; to see results.</p>
+                <p className="text-muted-foreground">Vnesi svoje prihodke in stisni &quot;Izračunaj&quot; za izracun.</p>
               </div>
             )}
           </CardContent>
