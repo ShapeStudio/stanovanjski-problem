@@ -26,7 +26,6 @@ interface CalculationResult {
   maxPITI: number;
   totalDebt: number;
   maxTotalDebt: number;
-  income: number;
 }
 
 interface WealthCalculatorResult {
@@ -81,18 +80,19 @@ export default function Home() {
   };
 
   const parseFormattedNumber = (value: string) => {
-    return parseFloat(value.replace(/\./g, "")) || 0;
+    const cleanValue = value.replace(/[^\d.]/g, '');
+    return Number(cleanValue);
   };
 
   const getPaymentColor = (monthlyPayment: number, monthlyIncome: number) => {
-    const percentage = (monthlyPayment / monthlyIncome) * 100;
-    if (percentage <= 28) return "bg-green-500";
-    if (percentage <= 30) return "bg-yellow-500";
-    return "bg-red-500";
+    const ratio = (monthlyPayment / monthlyIncome) * 100;
+    if (ratio <= 28) return "text-green-600";
+    if (ratio <= 30) return "text-yellow-600";
+    return "text-red-600";
   };
 
   const calculateMonthlyPayments = (basePrice: number) => {
-    const { income, downPayment, interestRate, loanTerm, insuranceRate, hoaFees } = formData;
+    const { downPayment, interestRate, loanTerm, insuranceRate, hoaFees } = formData;
     
     // Convert percentages to decimals
     const r = interestRate / 100;
@@ -142,33 +142,28 @@ export default function Home() {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    const numericValue = name === "income" || name === "downPayment" || name === "monthlyDebt" || name === "hoaFees"
-      ? parseFormattedNumber(value)
-      : parseFloat(value) || 0;
+    const numericValue = parseFormattedNumber(value);
     
     setFormData((prev) => ({ ...prev, [name]: numericValue }));
   };
 
   const handleWealthChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    const numericValue = name === "currentCapital" || name === "monthlyIncome"
-      ? parseFormattedNumber(value)
-      : parseFloat(value) || 0;
-    
-    setWealthData((prev) => ({ ...prev, [name]: numericValue }));
+    const numericValue = parseFormattedNumber(value);
+    setWealthData(prev => ({ ...prev, [name]: numericValue }));
   };
 
   const calculateAffordability = (e: React.FormEvent) => {
     e.preventDefault();
 
-    const { income, downPayment, monthlyDebt, interestRate, loanTerm, insuranceRate, hoaFees } = formData;
+    const { downPayment, monthlyDebt, interestRate, loanTerm, insuranceRate, hoaFees } = formData;
 
     // Convert percentages to decimals
     const r = interestRate / 100;
     const i = insuranceRate / 100;
 
     // Calculate monthly income and DTI limits
-    const monthlyIncome = income / 12;
+    const monthlyIncome = formData.income / 12;
     const maxPITI = monthlyIncome * 0.28; // 28% for housing
     const maxTotalDebt = monthlyIncome * 0.36; // 36% for total debt
 
@@ -212,8 +207,7 @@ export default function Home() {
       totalPITI,
       maxPITI,
       totalDebt,
-      maxTotalDebt,
-      income,
+      maxTotalDebt: monthlyIncome * 0.36,
     });
   };
 
@@ -404,7 +398,7 @@ export default function Home() {
                     <div className="text-center">
                       <h3 className="text-xl font-semibold mb-2">Privoščiš si lahko nepremičnino do:</h3>
                       <div className="text-3xl font-bold text-blue-600">{formatNumber(Math.round(calculateAdjustedPrice(result.maxPrice)))}€</div>
-                      {Number(((calculateAdjustedPayment(result.totalPITI) / (result.income / 12)) * 100).toFixed(1)) < 30 ? (
+                      {Number(((calculateAdjustedPayment(result.totalPITI) / (formData.income / 12)) * 100).toFixed(1)) < 30 ? (
                         <p className="text-sm text-gray-500 mt-2">
                           Glede na prihodek je izračunana vrednost smotrna.
                         </p>
@@ -421,7 +415,7 @@ export default function Home() {
                         <div 
                           className={`h-full rounded-full ${getPaymentColor(
                             calculateAdjustedPayment(result.totalPITI),
-                            result.income / 12
+                            formData.income / 12
                           )}`}
                           style={{ width: '100%' }}
                         ></div>
