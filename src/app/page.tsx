@@ -359,7 +359,7 @@ export default function Home() {
                     <div className="text-center">
                       <h3 className="text-xl font-semibold mb-2">Privoščiš si lahko nepremičnino do:</h3>
                       <div className="text-3xl font-bold text-blue-600">{formatCurrency(calculateAdjustedPrice(result.maxPrice))}</div>
-                      {Number(((calculateAdjustedPayment(result.totalPITI) / formData.income) * 100).toFixed(1)) <= 32 ? (
+                      {Number(((calculateAdjustedPayment(result.totalPITI) / formData.income) * 100).toFixed(1)) <= 30 ? (
                         <p className="text-sm text-gray-500 mt-2">
                           Glede na prihodek je izračunana vrednost smotrna.
                         </p>
