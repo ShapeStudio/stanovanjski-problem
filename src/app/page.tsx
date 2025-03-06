@@ -27,8 +27,8 @@ interface CalculationResult {
 }
 
 interface WealthCalculatorResult {
-  years: number[];
   capital: number[];
+  years: number;
 }
 
 const HouseIcon = () => (
@@ -149,6 +149,11 @@ export default function Home() {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
+  const handleFormInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: parseFloat(value) }));
+  };
+
   const handleWealthChange = (name: string) => (value: number) => {
     setWealthData(prev => ({ ...prev, [name]: value }));
   };
@@ -202,7 +207,7 @@ export default function Home() {
     const effectiveReturnRate = (wealthData.returnRate - wealthData.expenseRatio) / 100;
     const years = wealthData.years;
     
-    let capital = new Array(years + 1).fill(0);
+    const capital = new Array(years + 1).fill(0);
     capital[0] = wealthData.currentCapital;
 
     for (let year = 1; year <= years; year++) {
@@ -226,8 +231,8 @@ export default function Home() {
   return (
     <div className="container mx-auto p-4 max-w-4xl">
       <h1 className="text-2xl font-bold mb-4">Kako naj rešim stanovanjski problem?</h1>
-      <p>Orodje stanovanjski problem ponuja zastonjska orodja za izracunavanje potrebnih iznosov za nakup stanovanja. </p>
-      <p></p>
+      <p>Orodje stanovanjski problem ponuja brezplačna orodja za izračunavanje potrebnih zneskov za nakup stanovanja.</p>
+      <p className="mb-4">Z orodjem lahko izračunate, koliko stanovanja si lahko privoščite glede na vaš mesečni prihodek in prihranke ter kako lahko povečate svoje premoženje z vlaganjem.</p>
       <Tabs defaultValue="mortgage" className="space-y-4">
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="mortgage">Kalkulator Kredita</TabsTrigger>
@@ -276,11 +281,11 @@ export default function Home() {
                   </div>
                   <div>
                     <label htmlFor="interestRate" className="block text-sm font-medium">Obrestna mera (%)</label>
-                    <Input type="number" id="interestRate" name="interestRate" value={formData.interestRate} onChange={handleChange("interestRate")} step="0.1" min="0" max="20" required />
+                    <Input type="number" id="interestRate" name="interestRate" value={formData.interestRate} onChange={handleFormInputChange} step="0.1" min="0" max="20" required />
                   </div>
                   <div>
                     <label htmlFor="loanTerm" className="block text-sm font-medium">Trajanje kredita (let)</label>
-                    <Input type="number" id="loanTerm" name="loanTerm" value={formData.loanTerm} onChange={handleChange("loanTerm")} step="1" min="1" max="50" required />
+                    <Input type="number" id="loanTerm" name="loanTerm" value={formData.loanTerm} onChange={handleFormInputChange} step="1" min="1" max="50" required />
                   </div>
                   <Collapsible>
                     <CollapsibleTrigger asChild>
@@ -315,7 +320,7 @@ export default function Home() {
                               id="insuranceRate"
                               name="insuranceRate"
                               value={formData.insuranceRate}
-                              onChange={handleChange("insuranceRate")}
+                              onChange={handleFormInputChange}
                               step="0.1"
                               min="0.1"
                               max="0.5"
@@ -361,11 +366,11 @@ export default function Home() {
                       <div className="text-3xl font-bold text-blue-600">{formatCurrency(calculateAdjustedPrice(result.maxPrice))}</div>
                       {Number(((calculateAdjustedPayment(result.totalPITI) / formData.income) * 100).toFixed(1)) <= 30 ? (
                         <p className="text-sm text-gray-500 mt-2">
-                          Glede na prihodek je izračunana vrednost smotrna.
+                          Glede na vaše prihodke je izračunana vrednost smotrna.
                         </p>
                       ) : (
                         <p className="text-sm text-red-500 mt-2">
-                          Opozorilo: Mesečni stroški presegajo 30% mesečnega prihodka.
+                          Opozorilo: Mesečni stroški presegajo {formatPercent(30)} vaših mesečnih prihodkov.
                         </p>
                       )}
                     </div>
@@ -526,7 +531,7 @@ export default function Home() {
                     <label htmlFor="returnRate" className="block text-sm font-medium">
                       Pričakovana letna donosnost (%)
                       <p className="text-sm text-muted-foreground">
-                        Povprečna letna donosnost S&P 500 je približno 7%.
+                        Povprečna letna donosnost S&P 500 je približno 7 %.
                       </p>
                     </label>
                     <Input
@@ -554,7 +559,7 @@ export default function Home() {
                         <label htmlFor="expenseRatio" className="block text-sm font-medium">
                           Strošek sklada/indexa (%)
                           <p className="text-sm text-muted-foreground">
-                            Letni strošek upravljanja sklada. Običajno med 0.03% in 0.3%.
+                            Letni strošek upravljanja sklada. Običajno med 0,03 % in 0,3 %.
                           </p>
                         </label>
                         <Input
