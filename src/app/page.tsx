@@ -12,20 +12,18 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Separator } from "@/components/ui/separator";
+import CurrencyInput from "../components/CurrencyInput";
+import formatCurrency from "../utils/formatCurrency";
+import { ChevronDown } from 'lucide-react';
 
 interface CalculationResult {
   maxPrice: number;
-  centralSize: number;
-  centralType: string;
-  suburbSize: number;
-  suburbType: string;
+  loanAmount: number;
   mortgagePayment: number;
   monthlyInsurance: number;
   hoaFees: number;
   totalPITI: number;
-  maxPITI: number;
-  totalDebt: number;
-  maxTotalDebt: number;
+  annualIncome: number;
 }
 
 interface WealthCalculatorResult {
@@ -53,9 +51,23 @@ const PiggyBankIcon = () => (
   </svg>
 );
 
+const formatPercent = (value: number) => {
+  return value.toLocaleString('sl-SI', { 
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1 
+  }) + ' %';
+};
+
+const formatNumber = (value: number) => {
+  return value.toLocaleString('sl-SI', { 
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0 
+  });
+};
+
 export default function Home() {
   const [formData, setFormData] = useState({
-    income: 30000,
+    income: 1500,
     downPayment: 50000,
     monthlyDebt: 100,
     interestRate: 3,
@@ -66,23 +78,16 @@ export default function Home() {
 
   const [wealthData, setWealthData] = useState({
     currentCapital: 10000,
-    monthlyIncome: 2000,
+    monthlyIncome: 1500,
     investmentPercentage: 20,
-    returnRate: 10,
+    returnRate: 7,
+    expenseRatio: 0.07,
+    years: 20
   });
 
   const [result, setResult] = useState<CalculationResult | null>(null);
   const [wealthResult, setWealthResult] = useState<WealthCalculatorResult | null>(null);
   const [paymentAdjustment, setPaymentAdjustment] = useState(0); // -50 to +50 percent
-
-  const formatNumber = (value: number) => {
-    return value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-  };
-
-  const parseFormattedNumber = (value: string) => {
-    const cleanValue = value.replace(/[^\d.]/g, '');
-    return Number(cleanValue);
-  };
 
   const getPaymentColor = (monthlyPayment: number, monthlyIncome: number) => {
     const ratio = (monthlyPayment / monthlyIncome) * 100;
@@ -140,95 +145,74 @@ export default function Home() {
     }
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    const numericValue = parseFormattedNumber(value);
-    
-    setFormData((prev) => ({ ...prev, [name]: numericValue }));
+  const handleChange = (name: string) => (value: number) => {
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleWealthChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleWealthChange = (name: string) => (value: number) => {
+    setWealthData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    const numericValue = parseFormattedNumber(value);
-    setWealthData(prev => ({ ...prev, [name]: numericValue }));
+    setWealthData(prev => ({ ...prev, [name]: parseFloat(value) }));
   };
 
   const calculateAffordability = (e: React.FormEvent) => {
     e.preventDefault();
 
-    const { downPayment, monthlyDebt, interestRate, loanTerm, insuranceRate, hoaFees } = formData;
+    // Convert monthly income to annual income for calculations
+    const annualIncome = formData.income * 12;
+    
+    // Maximum monthly payment (33% of monthly income)
+    const maxMonthlyPayment = (formData.income * 0.33) - formData.monthlyDebt;
 
-    // Convert percentages to decimals
-    const r = interestRate / 100;
-    const i = insuranceRate / 100;
+    // Calculate maximum loan amount
+    const monthlyInterestRate = formData.interestRate / 100 / 12;
+    const numberOfPayments = formData.loanTerm * 12;
 
-    // Calculate monthly income and DTI limits
-    const monthlyIncome = formData.income / 12;
-    const maxPITI = monthlyIncome * 0.28; // 28% for housing
-    const maxTotalDebt = monthlyIncome * 0.36; // 36% for total debt
+    const maxLoanAmount = maxMonthlyPayment * ((1 - Math.pow(1 + monthlyInterestRate, -numberOfPayments)) / monthlyInterestRate);
 
-    // Calculate mortgage constant (m)
-    const monthlyRate = r / 12;
-    const totalPayments = loanTerm * 12;
-    const m = monthlyRate / (1 - Math.pow(1 + monthlyRate, -totalPayments));
+    // Add down payment to get maximum house price
+    const maxPrice = maxLoanAmount + formData.downPayment;
 
-    // Calculate maximum property price
-    const numerator = maxPITI + m * downPayment - hoaFees;
-    const denominator = m + i / 12;
-    let maxPrice = numerator / denominator;
-
-    // Verify back-end DTI and adjust if necessary
-    let loanAmount = maxPrice - downPayment;
-    let mortgagePayment = m * loanAmount;
-    let monthlyInsurance = (i * maxPrice) / 12;
-    let totalPITI = mortgagePayment + monthlyInsurance + hoaFees;
-    let totalDebt = totalPITI + monthlyDebt;
-
-    if (totalDebt > maxTotalDebt) {
-      const excessDebt = totalDebt - maxTotalDebt;
-      const adjustmentFactor = (maxPITI - excessDebt) / maxPITI;
-      maxPrice *= adjustmentFactor;
-      loanAmount = maxPrice - downPayment;
-      mortgagePayment = m * loanAmount;
-      monthlyInsurance = (i * maxPrice) / 12;
-      totalPITI = mortgagePayment + monthlyInsurance + hoaFees;
-      totalDebt = totalPITI + monthlyDebt;
-    }
+    // Calculate monthly costs
+    const loanAmount = maxPrice - formData.downPayment;
+    const mortgagePayment = (loanAmount * monthlyInterestRate * Math.pow(1 + monthlyInterestRate, numberOfPayments)) / (Math.pow(1 + monthlyInterestRate, numberOfPayments) - 1);
+    
+    const monthlyInsurance = (maxPrice * (formData.insuranceRate / 100)) / 12;
+    const hoaFees = formData.hoaFees;
+    const totalPITI = mortgagePayment + monthlyInsurance + hoaFees;
 
     setResult({
       maxPrice,
-      centralSize: maxPrice / 4687,
-      centralType: maxPrice / 4687 < 40 ? "Studio" : maxPrice / 4687 < 64 ? "One Bedroom" : maxPrice / 4687 < 90 ? "Two Bedroom" : "Three Bedroom or Larger",
-      suburbSize: maxPrice / 2500,
-      suburbType: maxPrice / 2500 < 40 ? "Studio" : maxPrice / 2500 < 64 ? "One Bedroom" : maxPrice / 2500 < 90 ? "Two Bedroom" : "Three Bedroom or Larger",
+      loanAmount,
       mortgagePayment,
       monthlyInsurance,
       hoaFees,
       totalPITI,
-      maxPITI,
-      totalDebt,
-      maxTotalDebt: monthlyIncome * 0.36,
+      annualIncome, // Add this to result
     });
   };
 
   const calculateWealth = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    const years = Array.from({ length: 21 }, (_, i) => i); // 0 to 20 years
-    const capital = years.map(year => {
-      const monthlyInvestment = (wealthData.monthlyIncome * wealthData.investmentPercentage) / 100;
-      const yearlyRate = wealthData.returnRate / 100;
-      
-      // Calculate compound interest with yearly contributions
-      let totalCapital = wealthData.currentCapital;
-      // Add monthly investments for the year and then apply yearly interest
-      totalCapital = totalCapital * Math.pow(1 + yearlyRate, year) + 
-                    monthlyInvestment * 12 * ((Math.pow(1 + yearlyRate, year) - 1) / yearlyRate);
-      
-      return Math.round(totalCapital);
-    });
 
-    setWealthResult({ years, capital });
+    const monthlyInvestment = (wealthData.monthlyIncome * wealthData.investmentPercentage) / 100;
+    const effectiveReturnRate = (wealthData.returnRate - wealthData.expenseRatio) / 100;
+    const years = wealthData.years;
+    
+    let capital = new Array(years + 1).fill(0);
+    capital[0] = wealthData.currentCapital;
+
+    for (let year = 1; year <= years; year++) {
+      capital[year] = (capital[year - 1] * (1 + effectiveReturnRate)) + (monthlyInvestment * 12);
+    }
+
+    setWealthResult({
+      capital,
+      years
+    });
   };
 
   const calculateAdjustedPrice = (price: number) => {
@@ -241,8 +225,9 @@ export default function Home() {
 
   return (
     <div className="container mx-auto p-4 max-w-4xl">
-      <h1 className="text-2xl font-bold mb-4">Kakšno stanovanje si lahko privoščim?</h1>
-      
+      <h1 className="text-2xl font-bold mb-4">Kako naj rešim stanovanjski problem?</h1>
+      <p>Orodje stanovanjski problem ponuja zastonjska orodja za izracunavanje potrebnih iznosov za nakup stanovanja. </p>
+      <p></p>
       <Tabs defaultValue="mortgage" className="space-y-4">
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="mortgage">Kalkulator Kredita</TabsTrigger>
@@ -260,60 +245,42 @@ export default function Home() {
               <CardContent>
                 <form onSubmit={calculateAffordability} className="space-y-4">
                   <div>
-                    <label htmlFor="income" className="block text-sm font-medium">Letni prihodek (neto)</label>
-                    <div className="relative">
-                      <Input 
-                        type="text" 
-                        id="income" 
-                        name="income" 
-                        value={formatNumber(formData.income)} 
-                        onChange={handleChange} 
-                        required 
-                      />
-                      <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none text-gray-500">
-                        €
-                      </div>
-                    </div>
+                    <label htmlFor="income" className="block text-sm font-medium">Mesečni prihodek</label>
+                    <CurrencyInput 
+                      id="income" 
+                      name="income" 
+                      value={formData.income} 
+                      onChange={handleChange("income")} 
+                      required 
+                    />
                   </div>
                   <div>
                     <label htmlFor="downPayment" className="block text-sm font-medium">Prihranki (vključen polog)</label>
-                    <div className="relative">
-                      <Input 
-                        type="text" 
-                        id="downPayment" 
-                        name="downPayment" 
-                        value={formatNumber(formData.downPayment)} 
-                        onChange={handleChange} 
-                        required 
-                      />
-                      <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none text-gray-500">
-                        €
-                      </div>
-                    </div>
+                    <CurrencyInput 
+                      id="downPayment" 
+                      name="downPayment" 
+                      value={formData.downPayment} 
+                      onChange={handleChange("downPayment")} 
+                      required 
+                    />
                   </div>
                   <div>
                     <label htmlFor="monthlyDebt" className="block text-sm font-medium">Trenutne mesečne obveznosti</label>
-                    <div className="relative">
-                      <Input 
-                        type="text" 
-                        id="monthlyDebt" 
-                        name="monthlyDebt" 
-                        value={formatNumber(formData.monthlyDebt)} 
-                        onChange={handleChange} 
-                        required 
-                      />
-                      <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none text-gray-500">
-                        €
-                      </div>
-                    </div>
+                    <CurrencyInput 
+                      id="monthlyDebt" 
+                      name="monthlyDebt" 
+                      value={formData.monthlyDebt} 
+                      onChange={handleChange("monthlyDebt")} 
+                      required 
+                    />
                   </div>
                   <div>
                     <label htmlFor="interestRate" className="block text-sm font-medium">Obrestna mera (%)</label>
-                    <Input type="number" id="interestRate" name="interestRate" value={formData.interestRate} onChange={handleChange} step="0.1" min="0" max="20" required />
+                    <Input type="number" id="interestRate" name="interestRate" value={formData.interestRate} onChange={handleChange("interestRate")} step="0.1" min="0" max="20" required />
                   </div>
                   <div>
                     <label htmlFor="loanTerm" className="block text-sm font-medium">Trajanje kredita (let)</label>
-                    <Input type="number" id="loanTerm" name="loanTerm" value={formData.loanTerm} onChange={handleChange} step="1" min="1" max="50" required />
+                    <Input type="number" id="loanTerm" name="loanTerm" value={formData.loanTerm} onChange={handleChange("loanTerm")} step="1" min="1" max="50" required />
                   </div>
                   <Collapsible>
                     <CollapsibleTrigger asChild>
@@ -348,7 +315,7 @@ export default function Home() {
                               id="insuranceRate"
                               name="insuranceRate"
                               value={formData.insuranceRate}
-                              onChange={handleChange}
+                              onChange={handleChange("insuranceRate")}
                               step="0.1"
                               min="0.1"
                               max="0.5"
@@ -365,19 +332,13 @@ export default function Home() {
                           <p className="text-sm text-muted-foreground">
                             Mesečni strošek stanovanjskega sklada. Običajno med 0€ in 200€.
                           </p>
-                          <div className="relative">
-                            <Input
-                              type="text"
-                              id="hoaFees"
-                              name="hoaFees"
-                              value={formatNumber(formData.hoaFees)}
-                              onChange={handleChange}
-                              required
-                            />
-                            <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none text-gray-500">
-                              €
-                            </div>
-                          </div>
+                          <CurrencyInput 
+                            id="hoaFees" 
+                            name="hoaFees" 
+                            value={formData.hoaFees} 
+                            onChange={handleChange("hoaFees")} 
+                            required 
+                          />
                         </div>
                       </div>
                     </CollapsibleContent>
@@ -397,14 +358,14 @@ export default function Home() {
                   <div className="space-y-6">
                     <div className="text-center">
                       <h3 className="text-xl font-semibold mb-2">Privoščiš si lahko nepremičnino do:</h3>
-                      <div className="text-3xl font-bold text-blue-600">{formatNumber(Math.round(calculateAdjustedPrice(result.maxPrice)))}€</div>
-                      {Number(((calculateAdjustedPayment(result.totalPITI) / (formData.income / 12)) * 100).toFixed(1)) < 30 ? (
+                      <div className="text-3xl font-bold text-blue-600">{formatCurrency(calculateAdjustedPrice(result.maxPrice))}</div>
+                      {Number(((calculateAdjustedPayment(result.totalPITI) / formData.income) * 100).toFixed(1)) <= 32 ? (
                         <p className="text-sm text-gray-500 mt-2">
                           Glede na prihodek je izračunana vrednost smotrna.
                         </p>
                       ) : (
-                        <p className="text-sm text-gray-500 mt-2">
-                          Glede na prihodek je izračunana vrednost rizična.
+                        <p className="text-sm text-red-500 mt-2">
+                          Opozorilo: Mesečni stroški presegajo 30% mesečnega prihodka.
                         </p>
                       )}
                     </div>
@@ -415,7 +376,7 @@ export default function Home() {
                         <div 
                           className={`h-full rounded-full ${getPaymentColor(
                             calculateAdjustedPayment(result.totalPITI),
-                            formData.income / 12
+                            formData.income
                           )}`}
                           style={{ width: '100%' }}
                         ></div>
@@ -432,7 +393,7 @@ export default function Home() {
                       {/* Monthly Payment Bubble */}
                       <div className="absolute right-0 top-12 bg-white rounded-lg shadow-lg p-2 border border-gray-200">
                         <p className="text-sm font-semibold">
-                          {formatNumber(Math.round(calculateAdjustedPayment(result.totalPITI)))}€ /mesec
+                          {formatCurrency(Math.round(calculateAdjustedPayment(result.totalPITI)))}
                         </p>
                       </div>
 
@@ -462,19 +423,19 @@ export default function Home() {
                           <ul className="list-none space-y-2">
                             <li className="flex justify-between">
                               <span>Kredit:</span>
-                              <span>{formatNumber(Math.round(calculateAdjustedPayment(result.mortgagePayment)))}</span>
+                              <span>{formatCurrency(Math.round(calculateAdjustedPayment(result.mortgagePayment)))}</span>
                             </li>
                             <li className="flex justify-between">
                               <span>Zavarovanje:</span>
-                              <span>{formatNumber(Math.round(calculateAdjustedPayment(result.monthlyInsurance)))}</span>
+                              <span>{formatCurrency(Math.round(calculateAdjustedPayment(result.monthlyInsurance)))}</span>
                             </li>
                             <li className="flex justify-between">
                               <span>Stanovanjski sklad:</span>
-                              <span>{formatNumber(calculateAdjustedPayment(result.hoaFees))}</span>
+                              <span>{formatCurrency(calculateAdjustedPayment(result.hoaFees))}</span>
                             </li>
                             <li className="flex justify-between font-semibold">
                               <span>Skupaj:</span>
-                              <span>{formatNumber(Math.round(calculateAdjustedPayment(result.totalPITI)))}</span>
+                              <span>{formatCurrency(Math.round(calculateAdjustedPayment(result.totalPITI)))}</span>
                             </li>
                           </ul>
                         </div>
@@ -502,20 +463,6 @@ export default function Home() {
                           }</p>
                         </div>
                       </div>
-
-                      <div className="space-y-2 border-t pt-4 mt-4">
-                        <p className="font-semibold">Mesečne obveznosti:</p>
-                        <div className="grid grid-cols-2 gap-2 text-sm">
-                          <p>Kredit:</p>
-                          <p className="text-right">{formatNumber(Math.round(calculateAdjustedPayment(result.mortgagePayment)))}</p>
-                          <p>Zavarovanje:</p>
-                          <p className="text-right">{formatNumber(Math.round(calculateAdjustedPayment(result.monthlyInsurance)))}</p>
-                          <p>Stroški sklada:</p>
-                          <p className="text-right">{formatNumber(calculateAdjustedPayment(result.hoaFees))}</p>
-                          <p className="font-semibold">Skupno mesečno obveznosti:</p>
-                          <p className="text-right font-semibold">{formatNumber(Math.round(calculateAdjustedPayment(result.totalPITI)))}</p>
-                        </div>
-                      </div>
                     </div>
                   </div>
                 )}
@@ -535,36 +482,24 @@ export default function Home() {
                 <form onSubmit={calculateWealth} className="space-y-4">
                   <div>
                     <label htmlFor="currentCapital" className="block text-sm font-medium">Trenutni kapital</label>
-                    <div className="relative">
-                      <Input
-                        type="text"
-                        id="currentCapital"
-                        name="currentCapital"
-                        value={formatNumber(wealthData.currentCapital)}
-                        onChange={handleWealthChange}
-                        required
-                      />
-                      <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none text-gray-500">
-                        €
-                      </div>
-                    </div>
+                    <CurrencyInput 
+                      id="currentCapital" 
+                      name="currentCapital" 
+                      value={wealthData.currentCapital} 
+                      onChange={handleWealthChange("currentCapital")} 
+                      required 
+                    />
                   </div>
 
                   <div>
                     <label htmlFor="monthlyIncome" className="block text-sm font-medium">Mesečni prihodek</label>
-                    <div className="relative">
-                      <Input
-                        type="text"
-                        id="monthlyIncome"
-                        name="monthlyIncome"
-                        value={formatNumber(wealthData.monthlyIncome)}
-                        onChange={handleWealthChange}
-                        required
-                      />
-                      <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none text-gray-500">
-                        €
-                      </div>
-                    </div>
+                    <CurrencyInput 
+                      id="monthlyIncome" 
+                      name="monthlyIncome" 
+                      value={wealthData.monthlyIncome} 
+                      onChange={handleWealthChange("monthlyIncome")} 
+                      required 
+                    />
                   </div>
 
                   <div>
@@ -575,7 +510,7 @@ export default function Home() {
                         id="investmentPercentage"
                         name="investmentPercentage"
                         value={wealthData.investmentPercentage}
-                        onChange={handleWealthChange}
+                        onChange={handleInputChange}
                         min="0"
                         max="100"
                         step="1"
@@ -588,25 +523,73 @@ export default function Home() {
                   </div>
 
                   <div>
-                    <label htmlFor="returnRate" className="block text-sm font-medium">Procent donosnosti</label>
-                    <div className="relative">
-                      <Input
-                        type="number"
-                        id="returnRate"
-                        name="returnRate"
-                        value={wealthData.returnRate}
-                        onChange={handleWealthChange}
-                        min="0"
-                        max="100"
-                        step="0.1"
-                        required
-                      />
-                      <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none text-gray-500">
-                        %
-                      </div>
-                    </div>
+                    <label htmlFor="returnRate" className="block text-sm font-medium">
+                      Pričakovana letna donosnost (%)
+                      <p className="text-sm text-muted-foreground">
+                        Povprečna letna donosnost S&P 500 je približno 7%.
+                      </p>
+                    </label>
+                    <Input
+                      type="number"
+                      id="returnRate"
+                      name="returnRate"
+                      value={wealthData.returnRate}
+                      onChange={handleInputChange}
+                      min="0"
+                      max="100"
+                      step="0.1"
+                      required
+                    />
                   </div>
 
+                  <Collapsible>
+                    <CollapsibleTrigger asChild>
+                      <Button variant="ghost" className="flex items-center justify-between w-full">
+                        <span>Napredno</span>
+                        <ChevronDown className="h-4 w-4" />
+                      </Button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="space-y-4">
+                      <div>
+                        <label htmlFor="expenseRatio" className="block text-sm font-medium">
+                          Strošek sklada/indexa (%)
+                          <p className="text-sm text-muted-foreground">
+                            Letni strošek upravljanja sklada. Običajno med 0.03% in 0.3%.
+                          </p>
+                        </label>
+                        <Input
+                          type="number"
+                          id="expenseRatio"
+                          name="expenseRatio"
+                          value={wealthData.expenseRatio}
+                          onChange={handleInputChange}
+                          min="0"
+                          max="2"
+                          step="0.01"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="years" className="block text-sm font-medium">
+                          Leta
+                          <p className="text-sm text-muted-foreground">
+                            Obdobje varčevanja v letih.
+                          </p>
+                        </label>
+                        <Input
+                          type="number"
+                          id="years"
+                          name="years"
+                          value={wealthData.years}
+                          onChange={handleInputChange}
+                          min="1"
+                          max="100"
+                          step="1"
+                          required
+                        />
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
                   <Button type="submit" className="w-full">Izračunaj</Button>
                 </form>
               </CardContent>
@@ -618,18 +601,18 @@ export default function Home() {
                   <CardTitle>Rezultati</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="h-[400px] w-full">
+                  <div style={{ width: '100%', height: '400px' }}>
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart
-                        data={wealthResult.years.map(year => ({
+                        data={Array.from({ length: wealthResult.years + 1 }, (_, year) => ({
                           year,
                           capital: wealthResult.capital[year]
                         }))}
                         margin={{
-                          top: 20,
+                          top: 5,
                           right: 30,
                           left: 20,
-                          bottom: 20,
+                          bottom: 5,
                         }}
                       >
                         <CartesianGrid strokeDasharray="3 3" />
@@ -642,17 +625,17 @@ export default function Home() {
                           }}
                         />
                         <YAxis 
-                          tickFormatter={(value) => `${formatNumber(value)}€`}
+                          tickFormatter={(value) => formatCurrency(value)}
                           label={{ 
-                            value: 'Kapital', 
+                            value: 'Kapital (€)', 
                             angle: -90, 
                             position: 'left',
                             offset: 0
                           }}
                         />
                         <Tooltip 
-                          formatter={(value: number) => [`${formatNumber(value)}€`, 'Kapital']}
-                          labelFormatter={(label: number) => `Leto ${label}`}
+                          formatter={(value: number) => [formatCurrency(value), 'Kapital']}
+                          labelFormatter={(label: number) => `Leto ${formatNumber(label)}`}
                         />
                         <Line
                           type="monotone"
@@ -667,19 +650,31 @@ export default function Home() {
                   <div className="mt-4 space-y-2">
                     <div className="flex justify-between items-center">
                       <span className="text-sm font-medium">Začetni kapital:</span>
-                      <span className="text-sm">{formatNumber(wealthResult.capital[0])}€</span>
+                      <span className="text-sm">{formatCurrency(wealthResult.capital[0])}</span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-sm font-medium">Končni kapital:</span>
-                      <span className="text-sm font-semibold text-blue-600">{formatNumber(wealthResult.capital[20])}€</span>
+                      <span className="text-sm font-semibold text-blue-600">{formatCurrency(wealthResult.capital[wealthData.years])}</span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-sm font-medium">Mesečno vlaganje:</span>
-                      <span className="text-sm">{formatNumber((wealthData.monthlyIncome * wealthData.investmentPercentage) / 100)}€</span>
+                      <span className="text-sm">{formatCurrency((wealthData.monthlyIncome * wealthData.investmentPercentage) / 100)}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-medium">Procent varčevanja:</span>
+                      <span className="text-sm">{formatPercent(wealthData.investmentPercentage)}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-medium">Pričakovana donosnost:</span>
+                      <span className="text-sm">{formatPercent(wealthData.returnRate)}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-medium">Strošek sklada:</span>
+                      <span className="text-sm">{formatPercent(wealthData.expenseRatio)}</span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-sm font-medium">Skupni donos:</span>
-                      <span className="text-sm">{formatNumber(wealthResult.capital[20] - wealthResult.capital[0] - ((wealthData.monthlyIncome * wealthData.investmentPercentage) / 100) * 12 * 20)}€</span>
+                      <span className="text-sm">{formatCurrency(wealthResult.capital[wealthData.years] - wealthResult.capital[0] - ((wealthData.monthlyIncome * wealthData.investmentPercentage) / 100) * 12 * wealthData.years)}</span>
                     </div>
                   </div>
                 </CardContent>
